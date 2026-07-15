@@ -142,8 +142,6 @@
               <th data-key="pct_qty" class="num">% Tổng SL</th>
               <th data-key="cost" class="num">Chi phí (USD)</th>
               <th data-key="pct_cost" class="num">% Tổng chi phí</th>
-              <th data-key="valid_orders" class="num">Đơn hợp lệ</th>
-              <th data-key="cancelled_orders" class="num">Đơn loại (huỷ/hoàn)</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -274,7 +272,6 @@ function renderKPIs() {
   const cards = [
     {label:'Tổng số lượng (T1-T6/2026)', value: fmtInt(gt.quantity)+' sp', sub:'Toàn bộ NCC hợp lệ'},
     {label:'Tổng chi phí', value: fmtUsd(gt.cost), sub:'Đã trừ đơn huỷ/hoàn'},
-    {label:'Đơn hợp lệ', value: fmtInt(gt.valid_orders), sub: fmtInt(gt.cancelled_orders)+' đơn bị loại (huỷ/hoàn)'},
     {label:'Nhà cung cấp hoạt động', value: activeSuppliers+' / '+DATA.suppliers.length, sub:'Có phát sinh đơn hàng trong kỳ'},
   ];
   document.getElementById('kpi-row').innerHTML = cards.map(c=>`
@@ -378,8 +375,6 @@ function renderSupplierTable() {
     {key:'pct_qty', num:true, format:fmtPct},
     {key:'cost', num:true, format:fmtUsd},
     {key:'pct_cost', num:true, format:fmtPct},
-    {key:'valid_orders', num:true, format:fmtInt},
-    {key:'cancelled_orders', num:true, format:fmtInt},
   ], 'supplierSearch', ['name']);
 }
 
