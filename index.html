@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Thống Kê Nhà Cung Cấp POD - T1-T6/2026</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --navy: #1E2761;
+    --navy-light: #2C3878;
+    --ice: #CADCFC;
+    --ice-soft: #EEF3FE;
+    --gold: #D4A017;
+    --text: #1F2430;
+    --muted: #6B7280;
+    --danger: #B3261E;
+    --danger-bg: #FDECEA;
+    --border: #E4E8F1;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: Calibri, Arial, sans-serif; background:#F5F7FC; color:var(--text); }
+  .app { display:flex; min-height:100vh; }
+  .sidebar { width:230px; background:var(--navy); color:#fff; flex-shrink:0; padding:28px 0; position:sticky; top:0; height:100vh; }
+  .sidebar .brand { padding:0 22px 24px 22px; border-bottom:1px solid rgba(255,255,255,0.12); margin-bottom:12px; }
+  .sidebar .brand h1 { font-size:16px; margin:0 0 4px 0; font-weight:700; line-height:1.3; }
+  .sidebar .brand p { font-size:11.5px; margin:0; color:var(--ice); opacity:0.85; }
+  .navbtn { display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:none; border:none; color:#DCE3F7; padding:13px 22px; font-size:14px; cursor:pointer; transition:background .15s; font-family:inherit; }
+  .navbtn .dot { width:7px; height:7px; border-radius:50%; background:rgba(255,255,255,0.35); flex-shrink:0; }
+  .navbtn:hover { background:rgba(255,255,255,0.06); }
+  .navbtn.active { background:rgba(255,255,255,0.12); color:#fff; font-weight:600; border-left:3px solid var(--gold); padding-left:19px; }
+  .navbtn.active .dot { background:var(--gold); }
+  .main { flex:1; padding:32px 40px 60px 40px; max-width:1400px; }
+  .pagehead { margin-bottom:26px; }
+  .pagehead h2 { font-size:23px; margin:0 0 6px 0; color:var(--navy); }
+  .pagehead p { margin:0; color:var(--muted); font-size:13.5px; }
+  .tab { display:none; }
+  .tab.active { display:block; }
+  .kpi-row { display:grid; grid-template-columns:repeat(auto-fit, minmax(210px,1fr)); gap:18px; margin-bottom:28px; }
+  .kpi-card { background:#fff; border-radius:10px; padding:20px 22px; box-shadow:0 1px 3px rgba(30,39,97,0.08); border:1px solid var(--border); }
+  .kpi-card .label { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; margin-bottom:8px; }
+  .kpi-card .value { font-size:28px; font-weight:700; color:var(--navy); }
+  .kpi-card .sub { font-size:12px; color:var(--muted); margin-top:4px; }
+  .grid-2 { display:grid; grid-template-columns:1.4fr 1fr; gap:20px; margin-bottom:24px; }
+  .panel { background:#fff; border-radius:10px; padding:22px; box-shadow:0 1px 3px rgba(30,39,97,0.08); border:1px solid var(--border); }
+  .panel h3 { margin:0 0 16px 0; font-size:15.5px; color:var(--navy); }
+  .panel .chart-wrap { position:relative; }
+  .callout { background:var(--danger-bg); border:1px solid #F3C7C3; border-radius:10px; padding:16px 20px; margin-bottom:22px; display:flex; gap:12px; align-items:flex-start; }
+  .callout .icon { font-size:20px; }
+  .callout .body b { color:var(--danger); }
+  .callout .body { font-size:13.5px; line-height:1.55; color:#5b1410; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { padding:10px 12px; text-align:left; border-bottom:1px solid var(--border); }
+  th { background:var(--ice-soft); color:var(--navy); font-weight:700; cursor:pointer; user-select:none; white-space:nowrap; position:sticky; top:0; }
+  th.num, td.num { text-align:right; font-variant-numeric:tabular-nums; }
+  tbody tr:hover { background:#FAFBFF; }
+  .table-scroll { max-height:480px; overflow:auto; border:1px solid var(--border); border-radius:8px; }
+  .searchbar { margin-bottom:14px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .searchbar input, .searchbar select { padding:8px 12px; border:1px solid var(--border); border-radius:7px; font-size:13px; font-family:inherit; }
+  .searchbar input { flex:1; min-width:200px; }
+  .badge { display:inline-block; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:600; }
+  .badge.warn { background:#FDECEA; color:var(--danger); }
+  .badge.ok { background:#E7F5EC; color:#1E7A3B; }
+  .missing-cell { color:var(--danger); font-weight:700; }
+  .note-section h4 { color:var(--navy); font-size:15px; margin:22px 0 8px 0; }
+  .note-section h4:first-child { margin-top:0; }
+  .note-section p { font-size:13.5px; line-height:1.65; color:#333; margin:0 0 10px 0; }
+  .note-section ul { margin:0 0 6px 0; padding-left:20px; }
+  .note-section li { font-size:13.5px; line-height:1.7; color:#333; }
+  .footer-note { margin-top:30px; font-size:11.5px; color:var(--muted); text-align:center; }
+  .two-col-select { display:flex; gap:16px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
+  .legend-chip { display:inline-flex; align-items:center; gap:6px; font-size:12.5px; margin-right:14px; cursor:pointer; }
+  .legend-chip .sw { width:11px; height:11px; border-radius:3px; display:inline-block; }
+  @media (max-width: 980px) {
+    .app { flex-direction:column; }
+    .sidebar { width:100%; height:auto; position:relative; display:flex; overflow-x:auto; padding:14px 0; }
+    .sidebar .brand { display:none; }
+    .navbtn { padding:10px 16px; white-space:nowrap; }
+    .navbtn.active { border-left:none; border-bottom:3px solid var(--gold); padding-left:16px; }
+    .grid-2 { grid-template-columns:1fr; }
+    .main { padding:20px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="sidebar">
+    <div class="brand">
+      <h1>Dashboard NCC POD</h1>
+      <p>Tháng 1 &ndash; Tháng 6, 2026</p>
+    </div>
+    <button class="navbtn active" data-tab="overview"><span class="dot"></span> Tổng quan</button>
+    <button class="navbtn" data-tab="suppliers"><span class="dot"></span> Nhà cung cấp</button>
+    <button class="navbtn" data-tab="products"><span class="dot"></span> Sản phẩm</button>
+    <button class="navbtn" data-tab="monthly"><span class="dot"></span> Chi phí theo tháng</button>
+    <button class="navbtn" data-tab="notes"><span class="dot"></span> Ghi chú &amp; giới hạn</button>
+  </div>
+  <div class="main">
+
+    <!-- OVERVIEW -->
+    <div class="tab active" id="tab-overview">
+      <div class="pagehead">
+        <h2>Tổng quan hoạt động Nhà cung cấp POD</h2>
+        <p>Số liệu tổng hợp từ nhật ký đơn hàng, đã loại trừ các đơn huỷ/hoàn &mdash; Giai đoạn Tháng 1&ndash;6/2026</p>
+      </div>
+      <div class="callout">
+        <div class="icon">&#9888;&#65039;</div>
+        <div class="body"><b>Lưu ý dữ liệu đang chờ bổ sung:</b> Best Fulfill-Topup hiện chỉ có chi phí cho T1&ndash;T3/2026 ($4,258.5 / $5,763.5 / $7,096.4). Dữ liệu T4&ndash;T6/2026 đang thiếu (không phải supplier ngừng nhận đơn) và sẽ được cập nhật khi có ảnh chụp màn hình bổ sung. Xem chi tiết ở tab "Chi phí theo tháng".</div>
+      </div>
+      <div class="kpi-row" id="kpi-row"></div>
+      <div class="grid-2">
+        <div class="panel">
+          <h3>Số lượng sản phẩm theo Nhà cung cấp (Top 8 + Khác)</h3>
+          <div class="chart-wrap" style="height:340px;"><canvas id="chartSupplierQty"></canvas></div>
+        </div>
+        <div class="panel">
+          <h3>Tỷ trọng chi phí theo Nhà cung cấp</h3>
+          <div class="chart-wrap" style="height:340px;"><canvas id="chartCostDonut"></canvas></div>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>Xu hướng chi phí tổng theo tháng</h3>
+        <div class="chart-wrap" style="height:300px;"><canvas id="chartMonthlyMini"></canvas></div>
+      </div>
+    </div>
+
+    <!-- SUPPLIERS -->
+    <div class="tab" id="tab-suppliers">
+      <div class="pagehead">
+        <h2>Chi tiết theo Nhà cung cấp</h2>
+        <p>Đầy đủ 16 nhà cung cấp trong workbook nguồn (bao gồm cả NCC không phát sinh đơn hợp lệ trong kỳ)</p>
+      </div>
+      <div class="searchbar">
+        <input type="text" id="supplierSearch" placeholder="Tìm nhà cung cấp...">
+      </div>
+      <div class="table-scroll">
+        <table id="supplierTable">
+          <thead>
+            <tr>
+              <th data-key="name">Nhà cung cấp</th>
+              <th data-key="quantity" class="num">Số lượng</th>
+              <th data-key="pct_qty" class="num">% Tổng SL</th>
+              <th data-key="cost" class="num">Chi phí (USD)</th>
+              <th data-key="pct_cost" class="num">% Tổng chi phí</th>
+              <th data-key="valid_orders" class="num">Đơn hợp lệ</th>
+              <th data-key="cancelled_orders" class="num">Đơn loại (huỷ/hoàn)</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PRODUCTS -->
+    <div class="tab" id="tab-products">
+      <div class="pagehead">
+        <h2>Cơ cấu sản phẩm</h2>
+        <p>138 mã sản phẩm được ghi nhận trong T1&ndash;T6/2026, tổng hợp toàn bộ NCC và chi tiết theo từng NCC</p>
+      </div>
+      <div class="panel" style="margin-bottom:24px;">
+        <h3>Top 20 sản phẩm theo số lượng (toàn bộ NCC)</h3>
+        <div class="chart-wrap" style="height:420px;"><canvas id="chartProductTop"></canvas></div>
+      </div>
+      <div class="panel" style="margin-bottom:24px;">
+        <h3>Toàn bộ 138 sản phẩm &ndash; tổng hợp tất cả NCC</h3>
+        <div class="searchbar">
+          <input type="text" id="productSearch" placeholder="Tìm sản phẩm...">
+        </div>
+        <div class="table-scroll">
+          <table id="productTable">
+            <thead>
+              <tr>
+                <th data-key="name">Sản phẩm</th>
+                <th data-key="quantity" class="num">Số lượng</th>
+                <th data-key="pct" class="num">% Tổng SL</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>Cơ cấu sản phẩm theo từng Nhà cung cấp</h3>
+        <div class="two-col-select">
+          <label for="supplierSelect" style="font-size:13px;color:var(--muted);">Chọn NCC:</label>
+          <select id="supplierSelect"></select>
+        </div>
+        <div class="grid-2">
+          <div class="chart-wrap" style="height:320px;"><canvas id="chartSupplierProduct"></canvas></div>
+          <div class="table-scroll" style="max-height:320px;">
+            <table id="supplierProductTable">
+              <thead><tr><th>Sản phẩm</th><th class="num">Số lượng</th><th class="num">% trong NCC</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MONTHLY -->
+    <div class="tab" id="tab-monthly">
+      <div class="pagehead">
+        <h2>Chi phí theo tháng (T1&ndash;T6/2026)</h2>
+        <p>Tổng chi phí và chi tiết theo từng nhà cung cấp</p>
+      </div>
+      <div class="callout">
+        <div class="icon">&#9888;&#65039;</div>
+        <div class="body"><b>Best Fulfill-Topup thiếu dữ liệu T4&ndash;T6/2026:</b> các ô đánh dấu đỏ trong bảng bên dưới là dữ liệu chưa có (hiển thị 0 theo nguồn hiện tại), không phải chi phí thực tế bằng 0. Sẽ cập nhật khi có ảnh chụp màn hình bổ sung từ nguồn khác.</div>
+      </div>
+      <div class="panel" style="margin-bottom:24px;">
+        <h3>Tổng chi phí theo tháng &ndash; Toàn bộ NCC &amp; Top 3 NCC lớn nhất</h3>
+        <div class="chart-wrap" style="height:380px;"><canvas id="chartMonthlyFull"></canvas></div>
+      </div>
+      <div class="panel">
+        <h3>Bảng chi phí theo tháng &ndash; từng Nhà cung cấp (USD)</h3>
+        <div class="table-scroll">
+          <table id="monthlyTable">
+            <thead>
+              <tr>
+                <th>Nhà cung cấp</th>
+                <th class="num">T1/2026</th>
+                <th class="num">T2/2026</th>
+                <th class="num">T3/2026</th>
+                <th class="num">T4/2026</th>
+                <th class="num">T5/2026</th>
+                <th class="num">T6/2026</th>
+                <th class="num">Tổng 6 tháng</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- NOTES -->
+    <div class="tab" id="tab-notes">
+      <div class="pagehead">
+        <h2>Ghi chú phương pháp &amp; giới hạn dữ liệu</h2>
+        <p>Toàn bộ nội dung ghi chú từ file báo cáo gốc, giữ nguyên nội dung</p>
+      </div>
+      <div class="panel">
+        <div class="note-section" id="notesContent"></div>
+      </div>
+    </div>
+
+    <div class="footer-note">Dashboard được tạo tự động từ workbook 2026.xlsx &middot; Dữ liệu trích xuất và tổng hợp cho giai đoạn Tháng 1&ndash;Tháng 6/2026</div>
+  </div>
+</div>
+
+<script>
+const DATA = {"grand_total": {"quantity": 196042, "cost": 3229542.99, "valid_orders": 1261, "cancelled_orders": 7}, "suppliers": [{"name": "JACK", "quantity": 138948, "cost": 2371297.5, "pct_qty": 0.708766488813622, "pct_cost": 0.734251721479639, "valid_orders": 156, "cancelled_orders": 0}, {"name": "EffiPrint", "quantity": 21608, "cost": 335138.22, "pct_qty": 0.110221279113659, "pct_cost": 0.103772645553172, "valid_orders": 192, "cancelled_orders": 2}, {"name": "Luxury Pro", "quantity": 10443, "cost": 171229.2, "pct_qty": 0.0532691974168801, "pct_cost": 0.0530196379271607, "valid_orders": 107, "cancelled_orders": 0}, {"name": "Bondre", "quantity": 10401, "cost": 159184.5, "pct_qty": 0.0530549576111241, "pct_cost": 0.0492901009501657, "valid_orders": 137, "cancelled_orders": 5}, {"name": "Melody", "quantity": 9700, "cost": 117162.8, "pct_qty": 0.0494791932341029, "pct_cost": 0.036278445700455, "valid_orders": 151, "cancelled_orders": 0}, {"name": "Falcont", "quantity": 1276, "cost": 17477.5, "pct_qty": 0.00650880933677477, "pct_cost": 0.00541175641696598, "valid_orders": 134, "cancelled_orders": 0}, {"name": "Best Fulfill-Topup", "quantity": 1599, "cost": 17118.4, "pct_qty": 0.00815641546199284, "pct_cost": 0.00530056421388588, "valid_orders": 56, "cancelled_orders": 0}, {"name": "CC TEXTILE", "quantity": 707, "cost": 14464.8, "pct_qty": 0.00360637006355781, "pct_cost": 0.00447889996968271, "valid_orders": 122, "cancelled_orders": 0}, {"name": "ToAddit", "quantity": 649, "cost": 12812.22, "pct_qty": 0.00331051509370441, "pct_cost": 0.00396719289375368, "valid_orders": 88, "cancelled_orders": 0}, {"name": "ZAFER", "quantity": 367, "cost": 7790.5, "pct_qty": 0.00187204782648616, "pct_cost": 0.00241226081341001, "valid_orders": 70, "cancelled_orders": 0}, {"name": "Zootop Beard", "quantity": 326, "cost": 5235.3, "pct_qty": 0.00166290896848634, "pct_cost": 0.00162106527648359, "valid_orders": 33, "cancelled_orders": 0}, {"name": "YOYCOL", "quantity": 12, "cost": 542.3, "pct_qty": 6.1211373073117e-05, "pct_cost": 0.000167918495489667, "valid_orders": 9, "cancelled_orders": 0}, {"name": "PANDA", "quantity": 4, "cost": 46.15, "pct_qty": 2.04037910243723e-05, "pct_cost": 1.42899475693309e-05, "valid_orders": 4, "cancelled_orders": 0}, {"name": "CustomEase", "quantity": 2, "cost": 43.6, "pct_qty": 1.02018955121862e-05, "pct_cost": 1.35003621673418e-05, "valid_orders": 2, "cancelled_orders": 0}, {"name": "Zootop Beard_US", "quantity": 0, "cost": 0, "pct_qty": 0, "pct_cost": 0, "valid_orders": 0, "cancelled_orders": 0}, {"name": "GEARGAR-Topup", "quantity": 0, "cost": 0, "pct_qty": 0, "pct_cost": 0, "valid_orders": 0, "cancelled_orders": 0}], "overall_products": [{"name": "Grommet Flag - No Flag Pole Rings  3x5", "quantity": 36332, "pct": 0.185327633874374}, {"name": "Flag (Small)", "quantity": 31483, "pct": 0.160593138205079}, {"name": "Ceramic Coffer Mug", "quantity": 13081, "pct": 0.0667254975974536}, {"name": "Flag (Big)", "quantity": 11958, "pct": 0.0609971332673611}, {"name": "Grommet Flag - No Flag Pole Rings  4x6", "quantity": 9252, "pct": 0.0471939686393732}, {"name": "Crystal Ball Night Light (SJQXYD)", "quantity": 9241, "pct": 0.0471378582140562}, {"name": "Bloom Ceramic Vase 2 Side", "quantity": 6093, "pct": 0.0310800746778751}, {"name": "Non-Pleated Fan Flag 3x6_1pack", "quantity": 5167, "pct": 0.026356597055733}, {"name": "Grommet Flag - No Flag Pole Rings  5x8", "quantity": 4947, "pct": 0.0252343885493925}, {"name": "Grommet Flag - With  Flag Pole Rings  3x5", "quantity": 3934, "pct": 0.0200671284724702}, {"name": "3x5ft Flag", "quantity": 3829, "pct": 0.0195315289580804}, {"name": "Non-Pleated Fan Flag 1.5x3_1pack", "quantity": 3656, "pct": 0.0186490649962763}, {"name": "W-Beach Towel \nAdult", "quantity": 3649, "pct": 0.0186133583619837}, {"name": "Vertical Garden Flag Stand Frame", "quantity": 3452, "pct": 0.0176084716540333}, {"name": "Bloom Ceramic Vase", "quantity": 3255, "pct": 0.016603584946083}, {"name": "Flag Pole Kit For House", "quantity": 2081, "pct": 0.0106150722804297}, {"name": "250th Rose Wreath   15in", "quantity": 2069, "pct": 0.0105538609073566}, {"name": "Hand Held Flag\n10pcs", "quantity": 1914, "pct": 0.00976321400516216}, {"name": "Flower Vase M", "quantity": 1876, "pct": 0.00956937799043062}, {"name": "Non-Pleated Fan Flag 3x6_2pack", "quantity": 1863, "pct": 0.00950306566960141}, {"name": "Pottery Mug 12oz", "quantity": 1688, "pct": 0.00861039981228512}, {"name": "Rose Patriotic Wreath", "quantity": 1664, "pct": 0.00848797706613889}, {"name": "Non-Pleated Fan Flag 3x6_4pack", "quantity": 1660, "pct": 0.00846757327511452}, {"name": "Non-Pleated Fan Flag 1.5x3_2pack", "quantity": 1529, "pct": 0.00779934911906632}, {"name": "Conical Mug 12oz", "quantity": 1482, "pct": 0.00755960457452995}, {"name": "PlanPot", "quantity": 1448, "pct": 0.00738617235082278}, {"name": "Tapestry 50\"x60\"", "quantity": 1412, "pct": 0.00720253823160343}, {"name": "Grommet Flag - With Flag Pole Rings  4x6", "quantity": 1363, "pct": 0.00695259179155487}, {"name": "Mailbox Cover", "quantity": 1143, "pct": 0.00583038328521439}, {"name": "W-Beach Towel \n36x72", "quantity": 1112, "pct": 0.00567225390477551}, {"name": "Non-Pleated Fan Flag 1.5x3_4pack", "quantity": 1001, "pct": 0.00510604870384918}, {"name": "Jewelry Tray\nFull Surface Print", "quantity": 955, "pct": 0.00487140510706889}, {"name": "Grommet Flag - With Flag Pole Rings  5x8", "quantity": 901, "pct": 0.00459595392823987}, {"name": "Hand Held Flag\n1pcs", "quantity": 894, "pct": 0.00456024729394722}, {"name": "Hand Held Flag\n5pcs", "quantity": 874, "pct": 0.00445822833882535}, {"name": "Graduation Stole", "quantity": 860, "pct": 0.00438681507024005}, {"name": "Tapestry 68\"x80\"", "quantity": 834, "pct": 0.00425419042858163}, {"name": "Flower Vase S", "quantity": 811, "pct": 0.00413686863019149}, {"name": "Whisky Glass 11oz (Engrave)", "quantity": 777, "pct": 0.00396343640648432}, {"name": "Tapestry 43\"x57\"", "quantity": 653, "pct": 0.00333091888472878}, {"name": "America Whiskey Glass", "quantity": 635, "pct": 0.00323910182511911}, {"name": "Jewelry Tray\nInner Center Print", "quantity": 554, "pct": 0.00282592505687557}, {"name": "Mounting Ring 360°", "quantity": 533, "pct": 0.00271880515399761}, {"name": "Solar Led Lights Garden Flag", "quantity": 533, "pct": 0.00271880515399761}, {"name": "Plant Pot + Marker", "quantity": 529, "pct": 0.00269840136297324}, {"name": "Fence Banner 6x3ft", "quantity": 529, "pct": 0.00269840136297324}, {"name": "METAL SIGN  22x22", "quantity": 457, "pct": 0.00233113312453454}, {"name": "Tapestry 59\"x77\"", "quantity": 457, "pct": 0.00233113312453454}, {"name": "Tapestry 26\"x36\"", "quantity": 444, "pct": 0.00226482080370533}, {"name": "Fence Banner 4x2ft", "quantity": 434, "pct": 0.0022138113261444}, {"name": "Fence Banner     8x4ft", "quantity": 430, "pct": 0.00219340753512003}, {"name": "Stained Glass Custom Shape - Effi Print", "quantity": 428, "pct": 0.00218320563960784}, {"name": "Solar LED Fan Flag", "quantity": 415, "pct": 0.00211689331877863}, {"name": "Fence Banner 9x3ft", "quantity": 387, "pct": 0.00197406678160802}, {"name": "Tapestry 51\"x67\"", "quantity": 386, "pct": 0.00196896583385193}, {"name": "Fleece Blanket 50x60", "quantity": 377, "pct": 0.00192305730404709}, {"name": "Desk Mat", "quantity": 335, "pct": 0.00170881749829118}, {"name": "Beach Towel", "quantity": 325, "pct": 0.00165780802073025}, {"name": "W-Beach Towel\nKid size", "quantity": 321, "pct": 0.00163740422970588}, {"name": "Hand Held Flag\n2pcs", "quantity": 308, "pct": 0.00157109190887667}, {"name": "UV print", "quantity": 288, "pct": 0.00146907295375481}, {"name": "Custom ceramic mug", "quantity": 281, "pct": 0.00143336631946216}, {"name": "Acrylic Book Vase", "quantity": 234, "pct": 0.00119362177492578}, {"name": "Door Mat", "quantity": 228, "pct": 0.00116301608838922}, {"name": "blanket\n(youth)\n130*150", "quantity": 221, "pct": 0.00112730945409657}, {"name": "Flower Bouquet Vase With Flower", "quantity": 206, "pct": 0.00105079523775518}, {"name": "Fleece Blanket 60x80", "quantity": 193, "pct": 0.000984482916925965}, {"name": "Graduation Stole for Kids", "quantity": 190, "pct": 0.000969180073657686}, {"name": "Metal Flag Hanger For Porch", "quantity": 189, "pct": 0.000964079125901593}, {"name": "Truck Decal 58x24", "quantity": 186, "pct": 0.000948776282633313}, {"name": "Truck Decal 66x26", "quantity": 185, "pct": 0.00094367533487722}, {"name": "METAL SIGN  18x18", "quantity": 185, "pct": 0.00094367533487722}, {"name": "Journal Set (Print)", "quantity": 177, "pct": 0.000902867752828476}, {"name": "blanket\n(adult)\n150*200", "quantity": 167, "pct": 0.000851858275267545}, {"name": "Bloom Ceramic Vase 1 Side", "quantity": 151, "pct": 0.000770243111170055}, {"name": "METAL SIGN  14x14", "quantity": 140, "pct": 0.000714132685853032}, {"name": "Window Decal", "quantity": 139, "pct": 0.000709031738096938}, {"name": "Clipboard", "quantity": 137, "pct": 0.000698829842584752}, {"name": "METAL SIGN  12x12", "quantity": 137, "pct": 0.000698829842584752}, {"name": "Stained Glass Custom Shape-Rectangle", "quantity": 132, "pct": 0.000673325103804287}, {"name": "Fleece Blanket 30x40", "quantity": 114, "pct": 0.000581508044194611}, {"name": "Door Cover 36x80", "quantity": 89, "pct": 0.000453984350292284}, {"name": "Wind Spinner", "quantity": 88, "pct": 0.000448883402536191}, {"name": "Ceramic Ring Tray", "quantity": 80, "pct": 0.000408075820487447}, {"name": "Solar Outdoor Lights 6 led", "quantity": 74, "pct": 0.000377470133950888}, {"name": "250th Rose Wreath\n11in", "quantity": 65, "pct": 0.00033156160414605}, {"name": "Plant Marker", "quantity": 54, "pct": 0.000275451178829026}, {"name": "Door Cover 30x80", "quantity": 54, "pct": 0.000275451178829026}, {"name": "Tote Bag ETSY", "quantity": 53, "pct": 0.000270350231072933}, {"name": "Cork Mug 12oz", "quantity": 51, "pct": 0.000260148335560747}, {"name": "Swaying Butterfly Solar Garden Lights\n4 pack", "quantity": 48, "pct": 0.000244845492292468}, {"name": "Swaying Butterfly Solar Garden Lights\n2 pack", "quantity": 45, "pct": 0.000229542649024189}, {"name": "Garden Flag & Mailbox Cover", "quantity": 42, "pct": 0.000214239805755909}, {"name": "Solar Outdoor Lights 10 led", "quantity": 41, "pct": 0.000209138857999816}, {"name": "Window Flag Hanger", "quantity": 32, "pct": 0.000163230328194979}, {"name": "blanket\n30x40 inches", "quantity": 23, "pct": 0.000117321798390141}, {"name": "Beer Glass", "quantity": 21, "pct": 0.000107119902877955}, {"name": "Door Cover 32x80", "quantity": 21, "pct": 0.000107119902877955}, {"name": "Frame Ornament", "quantity": 17, "pct": 8.67161118535824e-05}, {"name": "Wash Cap", "quantity": 17, "pct": 8.67161118535824e-05}, {"name": "Tumbler\n20oz", "quantity": 16, "pct": 8.16151640974893e-05}, {"name": "Canvas  Bag 10oz", "quantity": 14, "pct": 7.14132685853031e-05}, {"name": "Beach Towel \nAdult", "quantity": 14, "pct": 7.14132685853031e-05}, {"name": "Stained Glass Custom Shape-Heart", "quantity": 13, "pct": 6.63123208292101e-05}, {"name": "Embroidered                        4in", "quantity": 12, "pct": 6.1211373073117e-05}, {"name": "Solar Outdoor Lights 8 led", "quantity": 12, "pct": 6.1211373073117e-05}, {"name": "Hand Held Flag\nGIFT", "quantity": 12, "pct": 6.1211373073117e-05}, {"name": "Tumbler\n40oz", "quantity": 11, "pct": 5.61104253170239e-05}, {"name": "Yard Sign\n24x18\n1 pack", "quantity": 11, "pct": 5.61104253170239e-05}, {"name": "Round Stained Glass", "quantity": 10, "pct": 5.10094775609308e-05}, {"name": "Desk Mat Colour", "quantity": 10, "pct": 5.10094775609308e-05}, {"name": "Whisky Glass 11oz -Engrave", "quantity": 10, "pct": 5.10094775609308e-05}, {"name": "RUG ZFRG", "quantity": 10, "pct": 5.10094775609308e-05}, {"name": "Embroidered                        5in", "quantity": 9, "pct": 4.59085298048377e-05}, {"name": "Door Cover 36x96", "quantity": 9, "pct": 4.59085298048377e-05}, {"name": "Corduroy Tote Bag", "quantity": 7, "pct": 3.57066342926516e-05}, {"name": "Yard Sign\n24x18\n2 pack", "quantity": 7, "pct": 3.57066342926516e-05}, {"name": "Vehicle Wrap 20\"x8\"", "quantity": 5, "pct": 2.55047387804654e-05}, {"name": "Jute Shopper Bag", "quantity": 5, "pct": 2.55047387804654e-05}, {"name": "Baseball Cap", "quantity": 4, "pct": 2.04037910243723e-05}, {"name": "Yard Sign\n18x12\n1 pack", "quantity": 4, "pct": 2.04037910243723e-05}, {"name": "Tapestry 88\" x 104\"", "quantity": 4, "pct": 2.04037910243723e-05}, {"name": "Whisky Glass 11oz-Print", "quantity": 3, "pct": 1.53028432682792e-05}, {"name": "Door Cover & Door Banner\n30x80", "quantity": 3, "pct": 1.53028432682792e-05}, {"name": "Vehicle Wrap 35\"x14\"", "quantity": 3, "pct": 1.53028432682792e-05}, {"name": "Beach Towel\nKid size", "quantity": 3, "pct": 1.53028432682792e-05}, {"name": "Embroidered                        6in", "quantity": 2, "pct": 1.02018955121862e-05}, {"name": "Pajamas Set (S-5XL）", "quantity": 2, "pct": 1.02018955121862e-05}, {"name": "Vehicle Wrap 66\"x26\"", "quantity": 2, "pct": 1.02018955121862e-05}, {"name": "Tumbler 10oz Full Collar", "quantity": 2, "pct": 1.02018955121862e-05}, {"name": "Embroidered", "quantity": 1, "pct": 5.10094775609308e-06}, {"name": "Zip Hoodie", "quantity": 1, "pct": 5.10094775609308e-06}, {"name": "HAWAII T-SHIRT", "quantity": 1, "pct": 5.10094775609308e-06}, {"name": "Door Cover & Door Banner\n36x80", "quantity": 1, "pct": 5.10094775609308e-06}, {"name": "Door Cover & Door Banner\n32x80", "quantity": 1, "pct": 5.10094775609308e-06}, {"name": "Colour Tote Bag", "quantity": 1, "pct": 5.10094775609308e-06}, {"name": "Vehicle Wrap 50\"x20\"", "quantity": 1, "pct": 5.10094775609308e-06}, {"name": "Yard Sign\n18x12\n2 pack", "quantity": 1, "pct": 5.10094775609308e-06}], "per_supplier_products": {"JACK": [{"name": "Grommet Flag - No Flag Pole Rings  3x5", "quantity": 36332, "pct": 0.261479114488874}, {"name": "Flag (Small)", "quantity": 31483, "pct": 0.226581167055301}, {"name": "Flag (Big)", "quantity": 11958, "pct": 0.0860609724501252}, {"name": "Grommet Flag - No Flag Pole Rings  4x6", "quantity": 9252, "pct": 0.0665860609724501}, {"name": "Non-Pleated Fan Flag 3x6_1pack", "quantity": 5167, "pct": 0.0371865733943634}, {"name": "Grommet Flag - No Flag Pole Rings  5x8", "quantity": 4947, "pct": 0.035603247257967}, {"name": "Grommet Flag - With  Flag Pole Rings  3x5", "quantity": 3934, "pct": 0.0283127500935602}, {"name": "3x5ft Flag", "quantity": 3829, "pct": 0.0275570717102801}, {"name": "Non-Pleated Fan Flag 1.5x3_1pack", "quantity": 3656, "pct": 0.0263120016121139}, {"name": "Vertical Garden Flag Stand Frame", "quantity": 3452, "pct": 0.0248438264674555}, {"name": "Flag Pole Kit For House", "quantity": 2081, "pct": 0.0149768258629127}, {"name": "250th Rose Wreath   15in", "quantity": 2069, "pct": 0.0148904626191093}, {"name": "Hand Held Flag\n10pcs", "quantity": 1914, "pct": 0.0137749373866482}, {"name": "Non-Pleated Fan Flag 3x6_2pack", "quantity": 1863, "pct": 0.0134078936004836}, {"name": "Rose Patriotic Wreath", "quantity": 1664, "pct": 0.0119757031407433}, {"name": "Non-Pleated Fan Flag 3x6_4pack", "quantity": 1660, "pct": 0.0119469153928088}, {"name": "Non-Pleated Fan Flag 1.5x3_2pack", "quantity": 1529, "pct": 0.0110041166479546}, {"name": "Grommet Flag - With Flag Pole Rings  4x6", "quantity": 1363, "pct": 0.00980942510867375}, {"name": "Mailbox Cover", "quantity": 1143, "pct": 0.0082260989722774}, {"name": "Non-Pleated Fan Flag 1.5x3_4pack", "quantity": 1001, "pct": 0.00720413392060339}, {"name": "Grommet Flag - With Flag Pole Rings  5x8", "quantity": 901, "pct": 0.00648444022224141}, {"name": "Hand Held Flag\n1pcs", "quantity": 894, "pct": 0.00643406166335608}, {"name": "Hand Held Flag\n5pcs", "quantity": 874, "pct": 0.00629012292368368}, {"name": "Mounting Ring 360°", "quantity": 533, "pct": 0.00383596741226934}, {"name": "Solar Led Lights Garden Flag", "quantity": 533, "pct": 0.00383596741226934}, {"name": "Fence Banner 6x3ft", "quantity": 529, "pct": 0.00380717966433486}, {"name": "METAL SIGN  22x22", "quantity": 457, "pct": 0.00328900020151424}, {"name": "Fence Banner 4x2ft", "quantity": 434, "pct": 0.00312347065089098}, {"name": "Fence Banner     8x4ft", "quantity": 430, "pct": 0.0030946829029565}, {"name": "Solar LED Fan Flag", "quantity": 415, "pct": 0.00298672884820221}, {"name": "Fence Banner 9x3ft", "quantity": 387, "pct": 0.00278521461266085}, {"name": "Hand Held Flag\n2pcs", "quantity": 308, "pct": 0.00221665659095489}, {"name": "Acrylic Book Vase", "quantity": 234, "pct": 0.00168408325416703}, {"name": "Metal Flag Hanger For Porch", "quantity": 189, "pct": 0.00136022108990414}, {"name": "Truck Decal 58x24", "quantity": 186, "pct": 0.00133863027895328}, {"name": "Truck Decal 66x26", "quantity": 185, "pct": 0.00133143334196966}, {"name": "METAL SIGN  18x18", "quantity": 185, "pct": 0.00133143334196966}, {"name": "METAL SIGN  14x14", "quantity": 140, "pct": 0.00100757117770677}, {"name": "METAL SIGN  12x12", "quantity": 137, "pct": 0.000985980366755909}, {"name": "Door Cover 36x80", "quantity": 89, "pct": 0.00064052739154216}, {"name": "Solar Outdoor Lights 6 led", "quantity": 74, "pct": 0.000532573336787863}, {"name": "250th Rose Wreath\n11in", "quantity": 65, "pct": 0.000467800903935285}, {"name": "Door Cover 30x80", "quantity": 54, "pct": 0.000388634597115468}, {"name": "Tote Bag ETSY", "quantity": 53, "pct": 0.000381437660131848}, {"name": "Swaying Butterfly Solar Garden Lights\n4 pack", "quantity": 48, "pct": 0.000345452975213749}, {"name": "Swaying Butterfly Solar Garden Lights\n2 pack", "quantity": 45, "pct": 0.00032386216426289}, {"name": "Garden Flag & Mailbox Cover", "quantity": 42, "pct": 0.00030227135331203}, {"name": "Solar Outdoor Lights 10 led", "quantity": 41, "pct": 0.000295074416328411}, {"name": "Window Flag Hanger", "quantity": 32, "pct": 0.000230301983475833}, {"name": "Door Cover 32x80", "quantity": 21, "pct": 0.000151135676656015}, {"name": "Wash Cap", "quantity": 17, "pct": 0.000122347928721536}, {"name": "Tumbler\n20oz", "quantity": 16, "pct": 0.000115150991737916}, {"name": "Canvas  Bag 10oz", "quantity": 14, "pct": 0.000100757117770677}, {"name": "Solar Outdoor Lights 8 led", "quantity": 12, "pct": 8.63632438034373e-05}, {"name": "Hand Held Flag\nGIFT", "quantity": 12, "pct": 8.63632438034373e-05}, {"name": "Tumbler\n40oz", "quantity": 11, "pct": 7.91663068198175e-05}, {"name": "Yard Sign\n24x18\n1 pack", "quantity": 11, "pct": 7.91663068198175e-05}, {"name": "Door Cover 36x96", "quantity": 9, "pct": 6.47724328525779e-05}, {"name": "Yard Sign\n24x18\n2 pack", "quantity": 7, "pct": 5.03785588853384e-05}, {"name": "Vehicle Wrap 20\"x8\"", "quantity": 5, "pct": 3.59846849180989e-05}, {"name": "Jute Shopper Bag", "quantity": 5, "pct": 3.59846849180989e-05}, {"name": "Yard Sign\n18x12\n1 pack", "quantity": 4, "pct": 2.87877479344791e-05}, {"name": "Door Cover & Door Banner\n30x80", "quantity": 3, "pct": 2.15908109508593e-05}, {"name": "Vehicle Wrap 35\"x14\"", "quantity": 3, "pct": 2.15908109508593e-05}, {"name": "Vehicle Wrap 66\"x26\"", "quantity": 2, "pct": 1.43938739672395e-05}, {"name": "Door Cover & Door Banner\n36x80", "quantity": 1, "pct": 7.19693698361977e-06}, {"name": "Door Cover & Door Banner\n32x80", "quantity": 1, "pct": 7.19693698361977e-06}, {"name": "Colour Tote Bag", "quantity": 1, "pct": 7.19693698361977e-06}, {"name": "Vehicle Wrap 50\"x20\"", "quantity": 1, "pct": 7.19693698361977e-06}, {"name": "Yard Sign\n18x12\n2 pack", "quantity": 1, "pct": 7.19693698361977e-06}, {"name": "Tổng", "quantity": 138948, "pct": 1}], "EffiPrint": [{"name": "Ceramic Coffer Mug", "quantity": 13081, "pct": 0.605377637911885}, {"name": "Bloom Ceramic Vase 2 Side", "quantity": 6093, "pct": 0.281978896704924}, {"name": "Pottery Mug 12oz", "quantity": 1688, "pct": 0.0781192151055165}, {"name": "Stained Glass Custom Shape - Effi Print", "quantity": 428, "pct": 0.0198074787115883}, {"name": "Bloom Ceramic Vase 1 Side", "quantity": 151, "pct": 0.00698815253609774}, {"name": "Ceramic Ring Tray", "quantity": 80, "pct": 0.00370233246945576}, {"name": "Cork Mug 12oz", "quantity": 51, "pct": 0.00236023694927805}, {"name": "Frame Ornament", "quantity": 16, "pct": 0.000740466493891152}, {"name": "Round Stained Glass", "quantity": 10, "pct": 0.00046279155868197}, {"name": "Desk Mat Colour", "quantity": 10, "pct": 0.00046279155868197}, {"name": "Tổng", "quantity": 21608, "pct": 1}], "Luxury Pro": [{"name": "Crystal Ball Night Light (SJQXYD)", "quantity": 9241, "pct": 0.884898975390214}, {"name": "Graduation Stole", "quantity": 860, "pct": 0.0823518146126592}, {"name": "Desk Mat", "quantity": 335, "pct": 0.0320789045293498}, {"name": "Corduroy Tote Bag", "quantity": 7, "pct": 0.000670305467777459}, {"name": "Tổng", "quantity": 10443, "pct": 1}], "Bondre": [{"name": "Bloom Ceramic Vase", "quantity": 3255, "pct": 0.31295067781944}, {"name": "Flower Vase M", "quantity": 1876, "pct": 0.180367272377656}, {"name": "Conical Mug 12oz", "quantity": 1482, "pct": 0.142486299394289}, {"name": "PlanPot", "quantity": 1448, "pct": 0.139217382943948}, {"name": "Flower Vase S", "quantity": 811, "pct": 0.0779732718007884}, {"name": "Plant Pot + Marker", "quantity": 529, "pct": 0.0508604941832516}, {"name": "Custom ceramic mug", "quantity": 281, "pct": 0.0270166330160561}, {"name": "Flower Bouquet Vase With Flower", "quantity": 206, "pct": 0.0198057879050091}, {"name": "Journal Set (Print)", "quantity": 177, "pct": 0.017017594462071}, {"name": "Clipboard", "quantity": 137, "pct": 0.0131718104028459}, {"name": "Stained Glass Custom Shape-Rectangle", "quantity": 132, "pct": 0.0126910873954427}, {"name": "Plant Marker", "quantity": 54, "pct": 0.00519180847995385}, {"name": "Stained Glass Custom Shape-Heart", "quantity": 13, "pct": 0.00124987981924815}, {"name": "Tổng", "quantity": 10401, "pct": 1}], "Melody": [{"name": "W-Beach Towel \nAdult", "quantity": 3649, "pct": 0.376185567010309}, {"name": "Tapestry 50\"x60\"", "quantity": 1412, "pct": 0.145567010309278}, {"name": "W-Beach Towel \n36x72", "quantity": 1112, "pct": 0.114639175257732}, {"name": "Tapestry 68\"x80\"", "quantity": 834, "pct": 0.085979381443299}, {"name": "Tapestry 43\"x57\"", "quantity": 653, "pct": 0.067319587628866}, {"name": "Tapestry 59\"x77\"", "quantity": 457, "pct": 0.0471134020618557}, {"name": "Tapestry 26\"x36\"", "quantity": 444, "pct": 0.0457731958762887}, {"name": "Tapestry 51\"x67\"", "quantity": 386, "pct": 0.0397938144329897}, {"name": "W-Beach Towel\nKid size", "quantity": 321, "pct": 0.0330927835051546}, {"name": "blanket\n(youth)\n130*150", "quantity": 221, "pct": 0.0227835051546392}, {"name": "blanket\n(adult)\n150*200", "quantity": 167, "pct": 0.0172164948453608}, {"name": "blanket\n30x40 inches", "quantity": 23, "pct": 0.00237113402061856}, {"name": "Beach Towel \nAdult", "quantity": 14, "pct": 0.00144329896907217}, {"name": "Tapestry 88\" x 104\"", "quantity": 4, "pct": 0.000412371134020619}, {"name": "Beach Towel\nKid size", "quantity": 3, "pct": 0.000309278350515464}, {"name": "Tổng", "quantity": 9700, "pct": 1}], "Falcont": [{"name": "Whisky Glass 11oz (Engrave)", "quantity": 777, "pct": 0.608934169278997}, {"name": "UV print", "quantity": 288, "pct": 0.225705329153605}, {"name": "Graduation Stole for Kids", "quantity": 190, "pct": 0.148902821316614}, {"name": "Beer Glass", "quantity": 21, "pct": 0.0164576802507837}, {"name": "Tổng", "quantity": 1276, "pct": 1}], "Best Fulfill-Topup": [{"name": "Jewelry Tray\nFull Surface Print", "quantity": 955, "pct": 0.597248280175109}, {"name": "Jewelry Tray\nInner Center Print", "quantity": 554, "pct": 0.346466541588493}, {"name": "Wind Spinner", "quantity": 88, "pct": 0.0550343964978111}, {"name": "Tumbler 10oz Full Collar", "quantity": 2, "pct": 0.00125078173858662}, {"name": "Tổng", "quantity": 1599, "pct": 1}], "CC TEXTILE": [{"name": "Fleece Blanket 50x60", "quantity": 377, "pct": 0.533239038189533}, {"name": "Fleece Blanket 60x80", "quantity": 193, "pct": 0.272984441301273}, {"name": "Fleece Blanket 30x40", "quantity": 114, "pct": 0.161244695898161}, {"name": "Embroidered                        4in", "quantity": 12, "pct": 0.016973125884017}, {"name": "Embroidered                        5in", "quantity": 9, "pct": 0.0127298444130127}, {"name": "Embroidered                        6in", "quantity": 2, "pct": 0.00282885431400283}, {"name": "Tổng", "quantity": 707, "pct": 1}], "ToAddit": [{"name": "America Whiskey Glass", "quantity": 635, "pct": 0.978428351309707}, {"name": "Whisky Glass 11oz -Engrave", "quantity": 10, "pct": 0.0154083204930663}, {"name": "Whisky Glass 11oz-Print", "quantity": 3, "pct": 0.00462249614791988}, {"name": "Frame Ornament", "quantity": 1, "pct": 0.00154083204930663}, {"name": "Tổng", "quantity": 649, "pct": 1}], "ZAFER": [{"name": "Door Mat", "quantity": 228, "pct": 0.62125340599455}, {"name": "Window Decal", "quantity": 139, "pct": 0.37874659400545}, {"name": "Tổng", "quantity": 367, "pct": 1}], "Zootop Beard": [{"name": "Beach Towel", "quantity": 325, "pct": 0.996932515337423}, {"name": "Embroidered", "quantity": 1, "pct": 0.00306748466257669}, {"name": "Tổng", "quantity": 326, "pct": 1}], "YOYCOL": [{"name": "RUG ZFRG", "quantity": 10, "pct": 0.833333333333333}, {"name": "Zip Hoodie", "quantity": 1, "pct": 0.0833333333333333}, {"name": "HAWAII T-SHIRT", "quantity": 1, "pct": 0.0833333333333333}, {"name": "Tổng", "quantity": 12, "pct": 1}], "PANDA": [{"name": "Baseball Cap", "quantity": 4, "pct": 1}, {"name": "Tổng", "quantity": 4, "pct": 1}], "CustomEase": [{"name": "Pajamas Set (S-5XL）", "quantity": 2, "pct": 1}, {"name": "Tổng", "quantity": 2, "pct": 1}]}, "monthly_total": {"labels": ["T1/2026", "T2/2026", "T3/2026", "T4/2026", "T5/2026", "T6/2026"], "values": [372042.47, 347281.56, 479205.88, 646142.17, 707905.16, 676965.75]}, "monthly_by_supplier": [{"name": "JACK", "values": [315513.8, 285045.7, 369751, 397256.5, 490869.2, 512861.3], "total": 2371297.5}, {"name": "EffiPrint", "values": [26374.45, 33227.7, 48118.17, 94490.73, 71183.23, 61743.94], "total": 335138.22}, {"name": "Luxury Pro", "values": [0, 436, 12128, 51739, 57562.2, 49364], "total": 171229.2}, {"name": "Bondre", "values": [6683.5, 5897.3, 16040.5, 68846.5, 45446.5, 16270.2], "total": 159184.5}, {"name": "Melody", "values": [9115.9, 9432.05, 18834.75, 23802.95, 28780.15, 27197], "total": 117162.8}, {"name": "Falcont", "values": [2882, 1619, 956.5, 1331.5, 5729.6, 4958.9], "total": 17477.5}, {"name": "Best Fulfill-Topup", "values": [4258.5, 5763.5, 7096.4, 0, 0, 0], "total": 17118.4}, {"name": "CC TEXTILE", "values": [3912.3, 2096, 2389, 2963, 2269, 835.5], "total": 14464.8}, {"name": "ToAddit", "values": [2104.92, 3098.91, 2234.36, 1972.69, 1167.93, 2233.41], "total": 12812.22}, {"name": "ZAFER", "values": [785.5, 561, 1357, 1738, 1927, 1422], "total": 7790.5}, {"name": "Zootop Beard", "values": [0, 0, 253.1, 2001.3, 2959.3, 21.6], "total": 5235.3}, {"name": "YOYCOL", "values": [399.9, 104.4, 25.7, 0, 0, 12.3], "total": 542.3}, {"name": "PANDA", "values": [11.7, 0, 0, 0, 11.05, 23.4], "total": 46.15}, {"name": "CustomEase", "values": [0, 0, 21.4, 0, 0, 22.2], "total": 43.6}, {"name": "Zootop Beard_US", "values": [0, 0, 0, 0, 0, 0], "total": 0}, {"name": "GEARGAR-Topup", "values": [0, 0, 0, 0, 0, 0], "total": 0}], "notes": ["BÁO CÁO THỐNG KÊ NHÀ CUNG CẤP POD - GHI CHÚ PHƯƠNG PHÁP & GIỚI HẠN DỮ LIỆU", "1. Phạm vi dữ liệu", "Báo cáo tổng hợp các đơn hàng có ngày đặt hàng (trích từ tên file/Invoice ID, định dạng kiểu \"PODGASUS-DD-Mon-YYYY...\" hoặc \"...export-YYYYMMDD...\") rơi vào khoảng Tháng 1/2026 - Tháng 6/2026. Các đơn không xác định được ngày (thường là các dòng điều chỉnh/hoàn tiền độc lập dạng \"EST######## refund/cancel\" không có ngày kèm theo) bị loại khỏi thống kê vì không thể xác nhận chúng thuộc giai đoạn 6 tháng này.", "2. Tiêu chí loại trừ đơn huỷ/hoàn", "Một dòng đơn hàng bị loại khỏi TẤT CẢ các số liệu (số lượng và chi phí) nếu nội dung kết hợp của các cột File Name/Invoice ID/Note/Invoice Status/Hoa Check RQ chứa (không phân biệt hoa thường) một trong các từ khoá: \"cancel\", \"refund\", \"huỷ\", \"hủy\", \"hoàn\". Điều này áp dụng cho cả các dòng điều chỉnh độc lập (vd: \"EST3886839525 refund\") lẫn các đơn gốc có ghi chú huỷ trực tiếp trong tên file (vd: \"2025 Supplier Refund\", \"N997986 refund\").", "Lưu ý: vì nhiều dòng điều chỉnh/hoàn tiền độc lập không có ngày (mục 1), chúng đã bị loại khỏi thống kê ngay từ bước lọc theo ngày trước khi bước lọc huỷ/hoàn được áp dụng. Do đó chi phí tổng có thể hơi cao hơn thực tế do một số khoản hoàn tiền/điều chỉnh âm gắn với các đơn trong giai đoạn này không được trừ vào.", "3. Các sheet KHÔNG được tính vào báo cáo và lý do", "• Mapping: Sheet tham chiếu nội bộ (cột Order ID/Invoice ID/Cost/Start Row cho từng NCC) - không phải log đơn hàng.", "• Sheet50: Bảng ánh xạ SKU sản phẩm / ghi chú lỗi công cụ đếm - không phải log đơn hàng.", "• Sheet53: Bảng tổng hợp thanh toán tuần (kỳ 05.07-11.07.2026, ngoài giai đoạn báo cáo) - không phải log đơn hàng chi tiết.", "• TOKEN: Bảng chi phí dự án/token theo shop Etsy (TELANI...) - cấu trúc và mục đích khác hẳn log đơn NCC, không liên quan trực tiếp đến các NCC POD.", "• XIAOLI: Không có dữ liệu đơn hàng thực tế nào được ghi nhận (toàn bộ vùng dữ liệu chỉ có giá trị 0 hoặc rỗng) - sheet không hoạt động.", "• PRINTWAY.IO-Topup: Không có dữ liệu đơn hàng thực tế nào được ghi nhận (toàn bộ = 0/rỗng) - sheet không hoạt động.", "• AMZ.GMB: Chỉ có dữ liệu đơn hàng tháng 12/2024, không có đơn nào trong T1-T6/2026; sheet cũng không có cột chi phí/Summary.", "• FLW: Sheet trống hoàn toàn (chỉ có header, không có dòng dữ liệu nào).", "• QIAO: Sheet trống hoàn toàn (chỉ có header/bảng giá tham chiếu, không có dòng đơn hàng nào).", "• DREAMSHIP: Sheet trống hoàn toàn (chỉ có header/bảng giá tham chiếu).", "• GEARMENT: Sheet trống hoàn toàn / header bị xáo trộn, không có dòng đơn hàng nào.", "• SHINEON: Gần như trống (chỉ có vài ô rác, không có đơn hàng thực).", "• Printify: Sheet trống hoàn toàn (chỉ có header, không có dòng dữ liệu nào).", "• Zootop Beard_US: Sheet trống (chỉ có 1 ô giá trị 0 sau phần tiêu đề), không có đơn hàng thực trong giai đoạn.", "• GEARGAR-Topup: Sheet gần như trống trong vùng đơn hàng (giá trị 0), một số dòng rải rác ở cuối sheet chỉ là bảng giá SKU tham khảo, không phải đơn hàng.", "4. NCC có dữ liệu nhưng cần lưu ý khi diễn giải", "• JACK: mỗi dòng dữ liệu trong sheet đại diện cho MỘT NGÀY (một lô/batch nhiều đơn gộp lại), không phải một đơn lẻ - cột \"MH STAFF confirm\" (do sheet Mapping xác định là cột chi phí) là tổng chi phí trong ngày, cột \"Quantity\" là tổng số lượng sản phẩm trong ngày. Số liệu đã được đối chiếu chéo với số lượng ghi trong tên file (vd \"...-1026-1124\" => 1124 sản phẩm) và khớp ~98%.", "• Melody: cấu trúc tương tự JACK (không có cột \"Quantity\" riêng nên số lượng được tính bằng tổng các cột sản phẩm); đối chiếu chéo với số cuối tên file khớp ~95%.", "• Bondre: sheet Mapping ghi cột chi phí là \"DU\", nhưng kiểm tra thực tế cho thấy DU = \"Discount\" và DV = \"Summary\" (cột chi phí thật). Báo cáo đã dùng DV làm cột chi phí sau khi xác minh bằng tra cứu trực tiếp nhãn tiêu đề \"Summary\" trên từng sheet.", "• Một số ô số lượng ở CC TEXTILE được lưu dưới dạng chữ (text) thay vì số (vd \"1\", \"4\") - đã được ép kiểu về số trước khi tính tổng.", "5. Phương pháp kiểm tra chéo (sanity check)", "Với các sheet có số lượng sản phẩm ghi kèm ở cuối tên file (vd \"...-20-20\", \"...-113-136\"), số cuối thường là tổng số sản phẩm của đơn. Đối chiếu số lượng tính được từ các cột sản phẩm với số này cho tỷ lệ khớp: Falcont 100%, ZAFER 100%, Luxury Pro 100%, Zootop Beard 100%, Best Fulfill-Topup 100%, CC TEXTILE 100% (sau khi sửa lỗi ép kiểu chuỗi số), PANDA 100%, CustomEase 100%, EffiPrint 98.6%, JACK 97.8%, ToAddit 97.2%, Bondre 94.8%, Melody 94.8%, YOYCOL 88.9% (mẫu rất nhỏ, chỉ 9 đơn). Các lệch nhỏ (thường 1-3 đơn vị) đến từ chênh lệch trong dữ liệu gốc, không phải lỗi công cụ trích xuất.", "6. Cột tham chiếu dùng để xác định cấu trúc mỗi sheet", "Sheet \"Mapping\" trong file gốc cung cấp cột Order ID, Invoice ID, Cost Clm (cột chi phí) và Start Row (dòng bắt đầu dữ liệu đơn hàng thực, sau các dòng tham chiếu giá \"Cost.../New Cost...\") cho 15/16 NCC. Best Fulfill-Topup không có trong Mapping và được xác định thủ công bằng cách kiểm tra cấu trúc tiêu đề trực tiếp (tương tự mẫu Falcont)."]};
+
+const fmtInt = n => Number(n).toLocaleString('en-US');
+const fmtUsd = n => '$' + Number(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+const fmtPct = n => (Number(n)*100).toFixed(2) + '%';
+
+const PALETTE = ['#1E2761','#3550A8','#5B8DEF','#8FB4F5','#CADCFC','#D4A017','#7A8AB8','#2C5F2D','#B3261E','#69A297'];
+
+// ---------- Tab switching ----------
+document.querySelectorAll('.navbtn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.navbtn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ---------- KPI cards ----------
+function renderKPIs() {
+  const gt = DATA.grand_total;
+  const activeSuppliers = DATA.suppliers.filter(s=>s.quantity>0).length;
+  const cards = [
+    {label:'Tổng số lượng (T1-T6/2026)', value: fmtInt(gt.quantity)+' sp', sub:'Toàn bộ NCC hợp lệ'},
+    {label:'Tổng chi phí', value: fmtUsd(gt.cost), sub:'Đã trừ đơn huỷ/hoàn'},
+    {label:'Đơn hợp lệ', value: fmtInt(gt.valid_orders), sub: fmtInt(gt.cancelled_orders)+' đơn bị loại (huỷ/hoàn)'},
+    {label:'Nhà cung cấp hoạt động', value: activeSuppliers+' / '+DATA.suppliers.length, sub:'Có phát sinh đơn hàng trong kỳ'},
+  ];
+  document.getElementById('kpi-row').innerHTML = cards.map(c=>`
+    <div class="kpi-card">
+      <div class="label">${c.label}</div>
+      <div class="value">${c.value}</div>
+      <div class="sub">${c.sub}</div>
+    </div>`).join('');
+}
+
+// ---------- Supplier qty bar chart (top8 + Khac) ----------
+function renderSupplierChart() {
+  const sorted = [...DATA.suppliers].filter(s=>s.quantity>0).sort((a,b)=>b.quantity-a.quantity);
+  const top = sorted.slice(0,8);
+  const rest = sorted.slice(8);
+  const restSum = rest.reduce((a,s)=>a+s.quantity,0);
+  const labels = top.map(s=>s.name).concat(rest.length? ['Khác (' + rest.length + ' NCC)'] : []);
+  const values = top.map(s=>s.quantity).concat(rest.length? [restSum] : []);
+  new Chart(document.getElementById('chartSupplierQty'), {
+    type:'bar',
+    data:{ labels, datasets:[{ label:'Số lượng', data:values, backgroundColor: labels.map((_,i)=>PALETTE[i%PALETTE.length]), borderRadius:5 }]},
+    options:{
+      indexAxis:'y',
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label: ctx => fmtInt(ctx.raw)+' sản phẩm' } } },
+      scales:{ x:{ ticks:{ callback:v=>fmtInt(v) }, grid:{color:'#EEF1F8'} }, y:{ grid:{display:false} } }
+    }
+  });
+}
+
+// ---------- Cost donut ----------
+function renderCostDonut() {
+  const sorted = [...DATA.suppliers].filter(s=>s.cost>0).sort((a,b)=>b.cost-a.cost);
+  const top = sorted.slice(0,6);
+  const rest = sorted.slice(6);
+  const restSum = rest.reduce((a,s)=>a+s.cost,0);
+  const labels = top.map(s=>s.name).concat(rest.length? ['Khác'] : []);
+  const values = top.map(s=>s.cost).concat(rest.length? [restSum] : []);
+  new Chart(document.getElementById('chartCostDonut'), {
+    type:'doughnut',
+    data:{ labels, datasets:[{ data:values, backgroundColor: labels.map((_,i)=>PALETTE[i%PALETTE.length]) }]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{position:'bottom', labels:{boxWidth:11,font:{size:11}}}, tooltip:{ callbacks:{ label: ctx => ctx.label+': '+fmtUsd(ctx.raw) } } }
+    }
+  });
+}
+
+// ---------- Mini monthly total chart (overview) ----------
+function renderMonthlyMini() {
+  const m = DATA.monthly_total;
+  new Chart(document.getElementById('chartMonthlyMini'), {
+    type:'line',
+    data:{ labels:m.labels, datasets:[{ label:'Tổng chi phí (USD)', data:m.values, borderColor:'#1E2761', backgroundColor:'rgba(30,39,97,0.08)', fill:true, tension:.3, pointBackgroundColor:'#D4A017', pointRadius:5 }]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label: ctx=> fmtUsd(ctx.raw) } } },
+      scales:{ y:{ ticks:{ callback:v=>'$'+fmtInt(v) }, grid:{color:'#EEF1F8'} }, x:{ grid:{display:false} } }
+    }
+  });
+}
+
+// ---------- Sortable/searchable generic table ----------
+function makeSortableTable(tableId, rows, columns, searchInputId, searchKeys) {
+  let state = { key: null, dir: 1, filtered: rows };
+  const tbody = document.querySelector('#'+tableId+' tbody');
+  function draw() {
+    tbody.innerHTML = state.filtered.map(r => '<tr>' + columns.map(c => {
+      const val = c.format ? c.format(r[c.key], r) : r[c.key];
+      return `<td class="${c.num?'num':''}">${val}</td>`;
+    }).join('') + '</tr>').join('');
+  }
+  document.querySelectorAll('#'+tableId+' th').forEach(th => {
+    th.addEventListener('click', () => {
+      const key = th.dataset.key;
+      if (!key) return;
+      state.dir = (state.key === key) ? -state.dir : 1;
+      state.key = key;
+      state.filtered.sort((a,b) => {
+        const av=a[key], bv=b[key];
+        if (typeof av === 'string') return av.localeCompare(bv) * state.dir;
+        return (av-bv) * state.dir;
+      });
+      draw();
+    });
+  });
+  if (searchInputId) {
+    document.getElementById(searchInputId).addEventListener('input', (e) => {
+      const q = e.target.value.trim().toLowerCase();
+      state.filtered = rows.filter(r => searchKeys.some(k => String(r[k]).toLowerCase().includes(q)));
+      draw();
+    });
+  }
+  draw();
+}
+
+function renderSupplierTable() {
+  makeSortableTable('supplierTable', [...DATA.suppliers], [
+    {key:'name'},
+    {key:'quantity', num:true, format:fmtInt},
+    {key:'pct_qty', num:true, format:fmtPct},
+    {key:'cost', num:true, format:fmtUsd},
+    {key:'pct_cost', num:true, format:fmtPct},
+    {key:'valid_orders', num:true, format:fmtInt},
+    {key:'cancelled_orders', num:true, format:fmtInt},
+  ], 'supplierSearch', ['name']);
+}
+
+function renderProductTable() {
+  makeSortableTable('productTable', [...DATA.overall_products], [
+    {key:'name'},
+    {key:'quantity', num:true, format:fmtInt},
+    {key:'pct', num:true, format:fmtPct},
+  ], 'productSearch', ['name']);
+}
+
+function renderProductTop20() {
+  const top = [...DATA.overall_products].sort((a,b)=>b.quantity-a.quantity).slice(0,20);
+  new Chart(document.getElementById('chartProductTop'), {
+    type:'bar',
+    data:{ labels:top.map(p=>p.name.replace(/\n/g,' ')), datasets:[{ label:'Số lượng', data:top.map(p=>p.quantity), backgroundColor:'#3550A8', borderRadius:4 }]},
+    options:{
+      indexAxis:'y',
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label: ctx=>fmtInt(ctx.raw)+' sp' } } },
+      scales:{ x:{ ticks:{callback:v=>fmtInt(v)}, grid:{color:'#EEF1F8'} }, y:{ ticks:{ font:{size:10.5} }, grid:{display:false} } }
+    }
+  });
+}
+
+let supplierProductChart = null;
+function renderSupplierProductSelector() {
+  const names = Object.keys(DATA.per_supplier_products);
+  const sel = document.getElementById('supplierSelect');
+  sel.innerHTML = names.map(n=>`<option value="${n}">${n}</option>`).join('');
+  function update() {
+    const name = sel.value;
+    const rows = DATA.per_supplier_products[name].filter(r=>r.name !== 'Tổng');
+    document.querySelector('#supplierProductTable tbody').innerHTML = rows.map(r=>
+      `<tr><td>${r.name.replace(/\n/g,' ')}</td><td class="num">${fmtInt(r.quantity)}</td><td class="num">${fmtPct(r.pct)}</td></tr>`
+    ).join('');
+    if (supplierProductChart) supplierProductChart.destroy();
+    const top = rows.slice(0,10);
+    supplierProductChart = new Chart(document.getElementById('chartSupplierProduct'), {
+      type:'bar',
+      data:{ labels: top.map(r=>r.name.replace(/\n/g,' ')), datasets:[{ label:'Số lượng', data: top.map(r=>r.quantity), backgroundColor:'#1E2761', borderRadius:4 }]},
+      options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{display:false} },
+        scales:{ x:{ ticks:{callback:v=>fmtInt(v)} }, y:{ ticks:{font:{size:10.5}} } } }
+    });
+  }
+  sel.addEventListener('change', update);
+  update();
+}
+
+// ---------- Monthly full chart ----------
+function renderMonthlyFullChart() {
+  const m = DATA.monthly_total;
+  const top3 = [...DATA.monthly_by_supplier].sort((a,b)=>b.total-a.total).slice(0,3);
+  const colors = ['#D4A017','#5B8DEF','#69A297'];
+  new Chart(document.getElementById('chartMonthlyFull'), {
+    data:{
+      labels: m.labels,
+      datasets:[
+        { type:'bar', label:'Tổng cộng', data:m.values, backgroundColor:'rgba(30,39,97,0.15)', borderRadius:5, order:2 },
+        ...top3.map((s,i)=>({ type:'line', label:s.name, data:s.values, borderColor:colors[i], backgroundColor:colors[i], tension:.3, pointRadius:4, order:1 }))
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{position:'bottom'}, tooltip:{ callbacks:{ label: ctx=> ctx.dataset.label+': '+fmtUsd(ctx.raw) } } },
+      scales:{ y:{ ticks:{ callback:v=>'$'+fmtInt(v) }, grid:{color:'#EEF1F8'} }, x:{ grid:{display:false} } }
+    }
+  });
+}
+
+function renderMonthlyTable() {
+  const rows = [...DATA.monthly_by_supplier].sort((a,b)=>b.total-a.total);
+  const tbody = document.querySelector('#monthlyTable tbody');
+  tbody.innerHTML = rows.map(r => {
+    const isBF = r.name === 'Best Fulfill-Topup';
+    const cells = r.values.map((v,i) => {
+      if (isBF && i>=3) return `<td class="num missing-cell" title="Dữ liệu chưa có, đang chờ bổ sung">&mdash; <span style="font-size:10px;">(thiếu)</span></td>`;
+      return `<td class="num">${fmtUsd(v)}</td>`;
+    }).join('');
+    return `<tr><td>${r.name}${isBF?' <span class="badge warn">thiếu T4-T6</span>':''}</td>${cells}<td class="num"><b>${fmtUsd(r.total)}</b></td></tr>`;
+  }).join('') + `<tr style="background:#F5F7FC;font-weight:700;"><td>TỔNG CỘNG</td>${DATA.monthly_total.values.map(v=>`<td class="num">${fmtUsd(v)}</td>`).join('')}<td class="num">${fmtUsd(DATA.grand_total.cost)}</td></tr>`;
+}
+
+// ---------- Notes ----------
+function renderNotes() {
+  const el = document.getElementById('notesContent');
+  let html = '';
+  DATA.notes.forEach((line, i) => {
+    if (i === 0) { html += `<h3 style="color:var(--navy);margin-top:0;">${line}</h3>`; return; }
+    if (/^\d+\./.test(line)) { html += `<h4>${line}</h4>`; return; }
+    if (line.startsWith('•')) {
+      html += `<ul style="margin-top:0;"><li>${line.substring(1).trim()}</li></ul>`;
+      return;
+    }
+    html += `<p>${line}</p>`;
+  });
+  // merge consecutive <ul> blocks
+  html = html.replace(/<\/ul>\s*<ul style="margin-top:0;">/g, '');
+  el.innerHTML = html;
+}
+
+renderKPIs();
+renderSupplierChart();
+renderCostDonut();
+renderMonthlyMini();
+renderSupplierTable();
+renderProductTable();
+renderProductTop20();
+renderSupplierProductSelector();
+renderMonthlyFullChart();
+renderMonthlyTable();
+renderNotes();
+</script>
+</body>
+</html>
